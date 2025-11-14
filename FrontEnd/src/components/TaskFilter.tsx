@@ -27,7 +27,7 @@ function TaskFilter({
 
   const darkMode = theme === 'dark';
   const bgClass = darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200';
-  const textClass = darkMode ? 'text-slate-900 dark:text-white' : 'text-slate-900';
+  const labelClass = darkMode ? 'text-slate-300' : 'text-slate-700';
   const inputClass = darkMode
     ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400'
     : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500';
@@ -37,13 +37,14 @@ function TaskFilter({
   const buttonActiveClass = darkMode
     ? 'bg-blue-600 border-blue-500 text-white'
     : 'bg-blue-600 border-blue-500 text-white';
+  const statsTextClass = darkMode ? 'text-white' : 'text-slate-900';
 
   return (
     <div className={`${bgClass} border rounded-xl p-5 mb-6 shadow-sm`}>
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-semibold mb-2">Buscar tareas</label>
+            <label className={`block text-sm font-semibold mb-2 ${labelClass}`}>Buscar tareas</label>
             <input
               type="text"
               value={searchQuery}
@@ -54,7 +55,7 @@ function TaskFilter({
           </div>
 
           <div className="md:flex-1">
-            <label className="block text-sm font-semibold mb-2">Ordenar por</label>
+            <label className={`block text-sm font-semibold mb-2 ${labelClass}`}>Ordenar por</label>
             <div className="relative">
               <select
                 value={sortBy}
@@ -76,7 +77,7 @@ function TaskFilter({
           </div>
 
           <div className="md:flex-1">
-            <label className="block text-sm font-semibold mb-2">Filtrar</label>
+            <label className={`block text-sm font-semibold mb-2 ${labelClass}`}>Filtrar</label>
             <div className="relative">
               <select
                 value={filterBy}
@@ -99,19 +100,19 @@ function TaskFilter({
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className={`px-4 py-3 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-            <p className="text-xs font-medium opacity-75">Total</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className={`text-xs font-medium opacity-75 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Total</p>
+            <p className={`text-2xl font-bold ${statsTextClass}`}>{stats.total}</p>
           </div>
           <div className={`px-4 py-3 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-            <p className="text-xs font-medium opacity-75">Completadas</p>
+            <p className={`text-xs font-medium opacity-75 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Completadas</p>
             <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
           </div>
           <div className={`px-4 py-3 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-            <p className="text-xs font-medium opacity-75">En Progreso</p>
+            <p className={`text-xs font-medium opacity-75 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>En Progreso</p>
             <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
           </div>
           <div className={`px-4 py-3 rounded-lg ${darkMode ? 'bg-slate-700' : 'bg-slate-50'}`}>
-            <p className="text-xs font-medium opacity-75">Vencidas</p>
+            <p className={`text-xs font-medium opacity-75 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Vencidas</p>
             <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
           </div>
         </div>
