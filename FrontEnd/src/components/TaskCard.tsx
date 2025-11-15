@@ -61,9 +61,10 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
               <button
                 onClick={toggleTaskCompletion}
                 className={`flex-shrink-0 transition-colors ${
-                  isDark ? 'text-slate-500 hover:text-green-500' : 'text-slate-400 hover:text-green-600'
+                  isDark ? 'text-slate-300 hover:text-green-400' : 'text-slate-400 hover:text-green-600'
                 }`}
                 title={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
+                aria-label={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
               >
                 {task.completed ? (
                   <CheckCircle2 size={24} className="text-green-500" />
@@ -74,7 +75,7 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
             )}
             <h3 className={`text-lg font-bold flex-1 ${
               isTaskCompleted
-                ? `line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+                ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
                 : isDark ? 'text-white' : 'text-slate-900'
             }`}>
               {task.title}
@@ -85,9 +86,10 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
               onClick={() => onEdit(task)}
               className={`p-2 rounded-lg transition-colors ${
                 isDark
-                  ? 'text-slate-400 hover:bg-slate-700'
+                  ? 'text-slate-300 hover:bg-slate-700 hover:text-white'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
+              aria-label="Editar tarea"
             >
               <Edit2 size={16} />
             </button>
@@ -95,9 +97,10 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
               onClick={() => onDelete(task.id)}
               className={`p-2 rounded-lg transition-colors ${
                 isDark
-                  ? 'text-red-400 hover:bg-red-900/30'
+                  ? 'text-red-400 hover:bg-red-900/30 hover:text-red-300'
                   : 'text-red-600 hover:bg-red-50'
               }`}
+              aria-label="Eliminar tarea"
             >
               <Trash2 size={16} />
             </button>
@@ -105,21 +108,21 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
         </div>
 
         {task.description && (
-          <p className={`text-sm mb-4 line-clamp-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          <p className={`text-sm mb-4 line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             {task.description}
           </p>
         )}
 
         <div className="space-y-2 mb-4">
-          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             <Calendar size={16} />
             <span>{formatDateTime(task.startDateTime)} - {formatDateTime(task.endDateTime)}</span>
           </div>
-          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             <Clock size={16} />
             <span className="font-medium">{task.estimatedHours}h estimadas</span>
             {totalSubtasks > 0 && (
-              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>({subtasksHours}h en subtareas)</span>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-400'}>({subtasksHours}h en subtareas)</span>
             )}
           </div>
         </div>
@@ -128,7 +131,7 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
           <>
             <div className="mb-4">
               <div className="flex items-center justify-between text-sm mb-2">
-                <span className={`font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Progreso</span>
+                <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Progreso</span>
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {completedSubtasks}/{totalSubtasks}
                 </span>
@@ -173,8 +176,9 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
                 <button
                   onClick={() => toggleSubtask(subtask.id)}
                   className={`flex-shrink-0 transition-colors ${
-                    isDark ? 'text-slate-500 hover:text-green-500' : 'text-slate-400 hover:text-green-600'
+                    isDark ? 'text-slate-300 hover:text-green-400' : 'text-slate-400 hover:text-green-600'
                   }`}
+                  aria-label={subtask.completed ? 'Marcar subtarea como pendiente' : 'Marcar subtarea como completada'}
                 >
                   {subtask.completed ? (
                     <CheckCircle2 size={20} className="text-green-500" />
@@ -185,13 +189,13 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium ${
                     subtask.completed
-                      ? `line-through ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+                      ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
                       : isDark ? 'text-white' : 'text-slate-900'
                   }`}>
                     {subtask.title}
                   </p>
                 </div>
-                <span className={`flex-shrink-0 text-xs font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span className={`flex-shrink-0 text-xs font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
                   {subtask.estimatedHours}h
                 </span>
               </div>

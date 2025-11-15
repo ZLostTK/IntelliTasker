@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import connect_to_mongo, close_mongo_connection
 from app.services.task_service import init_indexes
 from app.api.tasks import router as tasks_router
+from app.api.ai import router as ai_router
 
 # Configurar logging
 logging.basicConfig(
@@ -62,6 +63,7 @@ app.add_middleware(
 
 # Incluir routers
 app.include_router(tasks_router)
+app.include_router(ai_router)
 
 
 @app.get("/", status_code=200)

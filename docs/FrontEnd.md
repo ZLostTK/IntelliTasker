@@ -33,6 +33,7 @@ Aplicación web desarrollada con React y TypeScript para gestionar tareas y proy
 - **React 18.3.1**: Biblioteca para construir interfaces de usuario
 - **TypeScript 5.5.3**: Superset de JavaScript con tipado estático
 - **Vite 5.4.2**: Build tool y servidor de desarrollo rápido
+- **React Router DOM 7.9.6**: Enrutamiento para aplicaciones React
 
 ### Estilos
 
@@ -60,6 +61,7 @@ Aplicación web desarrollada con React y TypeScript para gestionar tareas y proy
 La aplicación sigue una arquitectura de componentes basada en React con las siguientes características:
 
 - **Componentes Funcionales**: Todos los componentes utilizan funciones de React con Hooks
+- **React Router**: Enrutamiento para navegación entre páginas
 - **Manejo de Estado Local**: Usando `useState` para estado del componente
 - **Context API**: Para compartir el tema entre componentes
 - **Props y Callbacks**: Para comunicación entre componentes padre e hijo
@@ -129,10 +131,14 @@ FrontEnd/
 │   ├── components/          # Componentes React
 │   │   ├── CalendarView.tsx # Vista de calendario mensual
 │   │   ├── Header.tsx       # Header principal con navegación
+│   │   ├── Layout.tsx       # Layout compartido con Header
 │   │   ├── TaskCard.tsx     # Tarjeta individual de tarea
 │   │   ├── TaskFilter.tsx   # Filtros y ordenamiento
 │   │   ├── TaskForm.tsx     # Formulario de crear/editar tarea
 │   │   └── TaskList.tsx     # Lista de tareas
+│   │
+│   ├── pages/               # Páginas de la aplicación
+│   │   └── HomePage.tsx     # Página principal
 │   │
 │   ├── context/             # Contextos de React
 │   │   └── ThemeContext.tsx # Contexto del tema (claro/oscuro)
@@ -143,7 +149,7 @@ FrontEnd/
 │   ├── utils/               # Funciones utilitarias
 │   │   └── taskSort.ts      # Funciones de ordenamiento y filtrado
 │   │
-│   ├── App.tsx              # Componente principal
+│   ├── App.tsx              # Componente principal con Router
 │   ├── main.tsx             # Punto de entrada de la aplicación
 │   ├── index.css            # Estilos globales y Tailwind
 │   └── vite-env.d.ts        # Tipos de Vite
@@ -164,7 +170,21 @@ FrontEnd/
 
 ### App.tsx
 
-**Descripción**: Componente raíz de la aplicación que gestiona el estado global y coordina todos los componentes.
+**Descripción**: Componente raíz de la aplicación que configura React Router y el ThemeProvider.
+
+**Responsabilidades**:
+- Configura React Router para enrutamiento
+- Proporciona ThemeProvider para toda la aplicación
+- Define las rutas de la aplicación
+
+**Rutas Configuradas**:
+- `/`: Página principal (HomePage)
+
+---
+
+### HomePage.tsx
+
+**Descripción**: Página principal de la aplicación que gestiona el estado global y coordina todos los componentes.
 
 **Responsabilidades**:
 - Gestiona el estado global de las tareas
@@ -353,6 +373,7 @@ interface TaskFormProps {
 - Cálculo y visualización del total de horas de subtareas
 - Agregar/eliminar subtareas dinámicamente
 - Modo crear vs. modo editar
+- Botón de IA para generar tarea automáticamente usando Gemini
 
 **Funciones Principales**:
 
@@ -377,8 +398,20 @@ interface TaskFormProps {
 **Lanza**: Previene el envío si hay errores de validación.  
 **Efectos**: Llama a `onSave` con los datos del formulario.
 
+#### `handleGenerateWithAI(): Promise<void>`
+**Descripción**: Genera una tarea estructurada usando IA (Gemini) basándose en el título y descripción.  
+**Parámetros**: Ninguno  
+**Retorna**: `Promise<void>`  
+**Efectos**: 
+- Llama al endpoint `/ai/generate-task` del backend
+- Rellena automáticamente los campos del formulario con los datos generados
+- Genera subtareas si la tarea es compleja
+
 > [!WARNING]
 > El formulario valida que la fecha de fin sea posterior a la fecha de inicio. Si no se cumple, no se permite guardar.
+
+> [!NOTE]
+> El botón de IA solo está habilitado cuando hay un título ingresado. Muestra un tooltip "IA" al hacer hover.
 
 ---
 
@@ -721,22 +754,26 @@ export default defineConfig({
 
 ### Tailwind (tailwind.config.js)
 
-**Descripción**: Configuración del framework CSS Tailwind.
+**Descripción**: Configuración del framework CSS Tailwind con breakpoints y tamaños personalizados.
 
-```javascript
-/** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
-```
+**Breakpoints personalizados**:
+- `xs: 480px`: Móviles muy pequeños
+- `sm: 640px`: Móviles estándar
+- `md: 768px`: Tablets
+- `lg: 1024px`: Laptops
+- `xl: 1280px`: Desktops
+- `2xl: 1536px`: TVs y pantallas grandes
+- `3xl: 1920px`: TVs 4K o pantallas ultra anchas
+
+**Tamaños de fuente personalizados**:
+- `xs` a `4xl`: Con line-height optimizado
+
+**Espaciado adicional**:
+- `72`, `84`, `96`: Espaciado adicional para layouts complejos
 
 **Configuración**:
 - `content`: Archivos donde Tailwind buscará clases
-- `theme.extend`: Extensiones personalizadas del tema (vacío por defecto)
+- `theme.extend`: Extensiones personalizadas del tema con breakpoints y tamaños
 
 ### TypeScript
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Clock } from 'lucide-react';
+import { X, Plus, Trash2, Clock, Sparkles } from 'lucide-react';
 import { Task, Subtask } from '../types/task';
 import { useTheme } from '../context/ThemeContext';
 
@@ -20,6 +20,7 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [newSubtaskHours, setNewSubtaskHours] = useState(1);
+  const [isAILoading, setIsAILoading] = useState(false);
 
   useEffect(() => {
     if (task) {
@@ -39,6 +40,54 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
       setSubtasks([]);
     }
   }, [task]);
+
+  const handleGenerateWithAI = async () => {
+    if (!title.trim()) {
+      return;
+    }
+
+    setIsAILoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/ai/generate-task', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al generar tarea con IA');
+      }
+
+      const aiTask = await response.json();
+
+      // Rellenar el formulario con los datos generados
+      setDescription(aiTask.description || description);
+      setStartDateTime(aiTask.startDateTime || startDateTime);
+      setEndDateTime(aiTask.endDateTime || endDateTime);
+      setEstimatedHours(aiTask.estimatedHours || estimatedHours);
+
+      // Convertir subtareas de la IA al formato esperado
+      if (aiTask.subtasks && Array.isArray(aiTask.subtasks)) {
+        const formattedSubtasks: Subtask[] = aiTask.subtasks.map((st: { title: string; estimatedHours: number }, index: number) => ({
+          id: (Date.now() + index).toString(),
+          title: st.title,
+          estimatedHours: st.estimatedHours,
+          completed: false,
+        }));
+        setSubtasks(formattedSubtasks);
+      }
+    } catch (error) {
+      console.error('Error al generar tarea con IA:', error);
+      alert('Error al generar la tarea con IA. Por favor, intenta de nuevo.');
+    } finally {
+      setIsAILoading(false);
+    }
+  };
 
   const handleAddSubtask = () => {
     if (newSubtaskTitle.trim()) {
@@ -87,14 +136,14 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
   const subtasksTotal = subtasks.reduce((sum, st) => sum + st.estimatedHours, 0);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className={`rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 xs:p-4 z-50">
+      <div className={`rounded-xl xs:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] xs:max-h-[90vh] overflow-y-auto ${
         isDark ? 'bg-slate-800' : 'bg-white'
       }`}>
-        <div className={`sticky top-0 border-b px-6 py-4 flex items-center justify-between z-10 ${
+        <div className={`sticky top-0 border-b px-4 xs:px-6 py-3 xs:py-4 flex items-center justify-between z-10 ${
           isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'
         }`}>
-          <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <h2 className={`text-xl xs:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
             {task ? 'Editar Tarea' : 'Nueva Tarea'}
           </h2>
           <button
@@ -107,11 +156,33 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 xs:p-6 space-y-4 xs:space-y-6">
           <div>
-            <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-              Título *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className={`block text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                Título *
+              </label>
+              <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleGenerateWithAI}
+                  disabled={!title.trim() || isAILoading}
+                  className={`p-2 rounded-lg transition-all ${
+                    isDark
+                      ? 'text-yellow-400 hover:bg-slate-700 disabled:text-slate-600 disabled:cursor-not-allowed'
+                      : 'text-yellow-600 hover:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed'
+                  }`}
+                  title="IA"
+                >
+                  <Sparkles size={20} className={isAILoading ? 'animate-pulse' : ''} />
+                </button>
+                <div className={`absolute right-0 top-full mt-2 px-3 py-1.5 text-xs font-medium rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 whitespace-nowrap ${
+                  isDark ? 'bg-slate-700 text-white' : 'bg-slate-900 text-white'
+                }`}>
+                  IA
+                </div>
+              </div>
+            </div>
             <input
               type="text"
               value={title}
@@ -143,7 +214,7 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 xs:gap-4">
             <div>
               <label className={`block text-sm font-semibold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 Fecha y hora de inicio *

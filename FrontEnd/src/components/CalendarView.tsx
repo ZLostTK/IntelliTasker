@@ -98,7 +98,7 @@ function CalendarView({ tasks, onTaskClick }: CalendarViewProps) {
         <div className="grid grid-cols-7 gap-2 mb-2">
           {weekDays.map(day => (
             <div key={day} className={`text-center font-semibold text-sm py-2 ${
-              isDark ? 'text-slate-400' : 'text-slate-600'
+              isDark ? 'text-slate-300' : 'text-slate-600'
             }`}>
               {day}
             </div>
@@ -173,19 +173,19 @@ function CalendarView({ tasks, onTaskClick }: CalendarViewProps) {
             <div className={`w-4 h-4 border rounded ${
               isDark ? 'bg-blue-900/40 border-blue-600' : 'bg-blue-100 border-blue-300'
             }`}></div>
-            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Tareas en progreso</span>
+            <span className={isDark ? 'text-slate-200' : 'text-slate-600'}>Tareas en progreso</span>
           </div>
           <div className="flex items-center gap-2">
             <div className={`w-4 h-4 border rounded ${
               isDark ? 'bg-green-900/40 border-green-600' : 'bg-green-100 border-green-300'
             }`}></div>
-            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Tareas completadas</span>
+            <span className={isDark ? 'text-slate-200' : 'text-slate-600'}>Tareas completadas</span>
           </div>
           <div className="flex items-center gap-2">
             <div className={`w-4 h-4 border-2 rounded ${
               isDark ? 'bg-slate-700 border-blue-600' : 'bg-blue-50 border-blue-500'
             }`}></div>
-            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>Hoy</span>
+            <span className={isDark ? 'text-slate-200' : 'text-slate-600'}>Hoy</span>
           </div>
         </div>
       </div>

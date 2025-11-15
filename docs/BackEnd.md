@@ -74,6 +74,31 @@ async def lifespan(app: FastAPI):
     await close_mongo_connection()
 ```
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[Inicio de aplicación] --> B[Lifespan Startup]
+    B --> C[connect_to_mongo]
+    C --> D{Conexión exitosa?}
+    D -->|Sí| E[init_indexes]
+    D -->|No| F[Error - Aplicación no inicia]
+    E --> G{Aplicación lista}
+    G --> H[Servidor escuchando]
+    H --> I[Recibir requests]
+    I --> J[Procesar requests]
+    J --> I
+    I --> K[Señal de cierre]
+    K --> L[Lifespan Shutdown]
+    L --> M[close_mongo_connection]
+    M --> N[Aplicación cerrada]
+    
+    style A fill:#3b82f6,color:#fff
+    style H fill:#10b981,color:#fff
+    style F fill:#ef4444,color:#fff
+    style N fill:#6b7280,color:#fff
+```
+
 ##### `root() -> dict`
 **Descripción**: Endpoint raíz de la API que proporciona información básica.  
 **Retorna**: Diccionario con mensaje, versión y ruta de documentación.
@@ -99,8 +124,18 @@ async def lifespan(app: FastAPI):
 
 - `client: Optional[AsyncIOMotorClient]`: Cliente global de MongoDB.
 - `db`: Instancia de la base de datos.
-- `MONGODB_URL`: URL de conexión (por defecto: `mongodb://localhost:27017`).
-- `DATABASE_NAME`: Nombre de la base de datos (por defecto: `intellitasker`).
+- `db_settings: DatabaseSettings`: Configuración de la base de datos cargada desde `.env`.
+
+#### Clases
+
+##### `DatabaseSettings`
+**Descripción**: Configuración de la base de datos usando Pydantic Settings.  
+**Campos**:
+- `mongodb_url: str`: URL de conexión (por defecto: `mongodb://localhost:27017`).
+- `database_name: str`: Nombre de la base de datos (por defecto: `intellitasker`).
+
+**Configuración**:
+- Lee variables de entorno desde el archivo `.env`.
 
 #### Funciones
 
@@ -120,12 +155,37 @@ async def lifespan(app: FastAPI):
 ```python
 async def connect_to_mongo():
     client = AsyncIOMotorClient(
-        MONGODB_URL,
+        db_settings.mongodb_url,
         uuidRepresentation="standard",
         serverSelectionTimeoutMS=5000
     )
-    db = client[DATABASE_NAME]
+    db = client[db_settings.database_name]
     await client.admin.command('ping')
+```
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[connect_to_mongo] --> B[Cargar DatabaseSettings desde .env]
+    B --> C[Crear AsyncIOMotorClient]
+    C --> D[Configurar timeout 5s]
+    D --> E[Seleccionar base de datos]
+    E --> F[Ejecutar ping]
+    F --> G{ping exitoso?}
+    G -->|Sí| H[Log: Conectado exitosamente]
+    G -->|No| I[Exception: Error de conexión]
+    H --> J[Cliente global configurado]
+    
+    K[close_mongo_connection] --> L{Cliente existe?}
+    L -->|Sí| M[Cerrar cliente]
+    L -->|No| N[No hacer nada]
+    M --> O[Log: Conexión cerrada]
+    
+    style A fill:#3b82f6,color:#fff
+    style H fill:#10b981,color:#fff
+    style I fill:#ef4444,color:#fff
+    style K fill:#f59e0b,color:#fff
 ```
 
 ##### `close_mongo_connection() -> None`
@@ -162,6 +222,31 @@ def validate_object_id(id_str: str) -> ObjectId:
     if not ObjectId.is_valid(id_str):
         raise ValueError(f"Formato de ObjectId inválido: {id_str}")
     return ObjectId(id_str)
+```
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[validate_object_id] --> B[Recibir id_str]
+    B --> C{ObjectId.is_valid?}
+    C -->|Sí| D[Convertir a ObjectId]
+    C -->|No| E[Lanzar ValueError]
+    D --> F[Retornar ObjectId]
+    
+    G[object_id_to_str] --> H[Recibir documento]
+    H --> I{_id existe?}
+    I -->|Sí| J[Convertir _id a string]
+    I -->|No| K[Retornar documento sin cambios]
+    J --> L[Crear campo 'id' con string]
+    L --> M[Eliminar campo '_id']
+    M --> N[Retornar documento modificado]
+    
+    style A fill:#3b82f6,color:#fff
+    style E fill:#ef4444,color:#fff
+    style F fill:#10b981,color:#fff
+    style G fill:#3b82f6,color:#fff
+    style N fill:#10b981,color:#fff
 ```
 
 ##### `object_id_to_str(doc: dict) -> dict`
@@ -259,6 +344,27 @@ def validate_object_id(id_str: str) -> ObjectId:
 > [!IMPORTANT]
 > Esta función debe ejecutarse al iniciar la aplicación para garantizar un rendimiento óptimo en las consultas.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[init_indexes] --> B[Crear índice created_at]
+    B --> C{Índice creado?}
+    C -->|Sí| D[Crear índice completed]
+    C -->|No| E[Log error]
+    D --> F{Índice creado?}
+    F -->|Sí| G[Crear índice startDateTime]
+    F -->|No| E
+    G --> H{Índice creado?}
+    H -->|Sí| I[Log: Índices inicializados]
+    H -->|No| E
+    E --> J[Continuar sin índices]
+    
+    style A fill:#3b82f6,color:#fff
+    style I fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+```
+
 ##### `_prepare_task_document(task_data: dict) -> dict`
 **Descripción**: Prepara un documento de tarea para insertar en MongoDB. Convierte fechas a datetime UTC y añade timestamps.  
 **Parámetros**:
@@ -272,6 +378,27 @@ def validate_object_id(id_str: str) -> ObjectId:
 **Efectos secundarios**:
 - Genera ObjectId para cada subtarea.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[_prepare_task_document] --> B[Recibir task_data dict]
+    B --> C[Obtener fecha actual UTC]
+    C --> D[Convertir startDateTime ISO a datetime]
+    D --> E[Convertir endDateTime ISO a datetime]
+    E --> F{endDateTime > startDateTime?}
+    F -->|No| G[Lanzar ValueError]
+    F -->|Sí| H[Iterar subtareas]
+    H --> I[Generar ObjectId para cada subtarea]
+    I --> J[Crear documento MongoDB]
+    J --> K[Añadir created_at y updated_at]
+    K --> L[Retornar documento preparado]
+    
+    style A fill:#3b82f6,color:#fff
+    style L fill:#10b981,color:#fff
+    style G fill:#ef4444,color:#fff
+```
+
 ##### `_task_doc_to_response(doc: dict) -> TaskResponse`
 **Descripción**: Convierte un documento de MongoDB a `TaskResponse`.  
 **Parámetros**:
@@ -282,6 +409,27 @@ def validate_object_id(id_str: str) -> ObjectId:
 **Efectos secundarios**:
 - Convierte ObjectId a strings.
 - Convierte datetime a strings ISO 8601.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[_task_doc_to_response] --> B[Recibir documento MongoDB]
+    B --> C[object_id_to_str]
+    C --> D[Convertir _id a id string]
+    D --> E[Iterar subtareas]
+    E --> F[Convertir _id de subtarea a string]
+    F --> G[Crear SubtaskResponse para cada una]
+    G --> H[Convertir startDateTime a ISO]
+    H --> I[Convertir endDateTime a ISO]
+    I --> J[Convertir created_at a ISO]
+    J --> K[Convertir updated_at a ISO]
+    K --> L[Crear TaskResponse]
+    L --> M[Retornar TaskResponse]
+    
+    style A fill:#3b82f6,color:#fff
+    style M fill:#10b981,color:#fff
+```
 
 ##### `create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]`
 **Descripción**: Crea una nueva tarea en la base de datos.  
@@ -302,6 +450,30 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
     return _task_doc_to_response(created_doc)
 ```
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[create_task_service] --> B[Recibir TaskCreate]
+    B --> C[Convertir a dict]
+    C --> D[_prepare_task_document]
+    D --> E{Validación OK?}
+    E -->|No| F[Lanzar ValueError]
+    E -->|Sí| G[insert_one en MongoDB]
+    G --> H{Insert exitoso?}
+    H -->|No| I[Log error - Retornar None]
+    H -->|Sí| J[find_one con inserted_id]
+    J --> K{Documento encontrado?}
+    K -->|No| I
+    K -->|Sí| L[_task_doc_to_response]
+    L --> M[Retornar TaskResponse]
+    
+    style A fill:#3b82f6,color:#fff
+    style M fill:#10b981,color:#fff
+    style F fill:#ef4444,color:#fff
+    style I fill:#ef4444,color:#fff
+```
+
 ##### `get_task_by_id_service(task_id: str) -> Optional[TaskResponse]`
 **Descripción**: Obtiene una tarea por su ID.  
 **Parámetros**:
@@ -311,6 +483,28 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 
 **Lanza**:
 - Logs de advertencia si el ObjectId es inválido.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[get_task_by_id_service] --> B[Recibir task_id]
+    B --> C[validate_object_id]
+    C --> D{ObjectId válido?}
+    D -->|No| E[Log warning - Retornar None]
+    D -->|Sí| F[find_one con ObjectId]
+    F --> G{Documento encontrado?}
+    G -->|No| H[Log info - Retornar None]
+    G -->|Sí| I[_task_doc_to_response]
+    I --> J[Convertir ObjectId a string]
+    J --> K[Convertir datetime a ISO]
+    K --> L[Retornar TaskResponse]
+    
+    style A fill:#3b82f6,color:#fff
+    style L fill:#10b981,color:#fff
+    style E fill:#f59e0b,color:#fff
+    style H fill:#6b7280,color:#fff
+```
 
 ##### `get_all_tasks_service(completed: Optional[bool] = None, skip: int = 0, limit: int = 100) -> List[TaskResponse]`
 **Descripción**: Obtiene todas las tareas con filtros opcionales y paginación.  
@@ -323,6 +517,31 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 
 **Efectos secundarios**:
 - Ordena los resultados por `created_at` descendente.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[get_all_tasks_service] --> B[Recibir parámetros]
+    B --> C{completed proporcionado?}
+    C -->|Sí| D[Crear filtro con completed]
+    C -->|No| E[Filtro vacío]
+    D --> F[find con filtro]
+    E --> F
+    F --> G[sort por created_at desc]
+    G --> H[skip documentos]
+    H --> I[limit resultados]
+    I --> J[to_list]
+    J --> K{Documentos encontrados?}
+    K -->|Sí| L[Iterar documentos]
+    K -->|No| M[Retornar lista vacía]
+    L --> N[_task_doc_to_response para cada uno]
+    N --> O[Retornar List[TaskResponse]]
+    
+    style A fill:#3b82f6,color:#fff
+    style O fill:#10b981,color:#fff
+    style M fill:#6b7280,color:#fff
+```
 
 ##### `update_task_service(task_id: str, task_update: TaskUpdate) -> Optional[TaskResponse]`
 **Descripción**: Actualiza una tarea existente. Solo actualiza los campos proporcionados.  
@@ -341,12 +560,155 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 > [!WARNING]
 > Al actualizar subtareas, se reemplazan todas las subtareas existentes. Si solo quieres actualizar una subtarea específica, debes incluir todas las subtareas en la actualización.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[update_task_service] --> B[validate_object_id]
+    B --> C{ObjectId válido?}
+    C -->|No| D[Retornar None]
+    C -->|Sí| E[find_one para verificar existencia]
+    E --> F{Tarea existe?}
+    F -->|No| G[Log info - Retornar None]
+    F -->|Sí| H[model_dump exclude_unset]
+    H --> I{Hay fechas?}
+    I -->|Sí| J[Validar endDateTime > startDateTime]
+    I -->|No| K[Continuar]
+    J --> L{Validación OK?}
+    L -->|No| M[Lanzar ValueError]
+    L -->|Sí| K
+    K --> N{Hay subtareas?}
+    N -->|Sí| O[Generar ObjectId para cada subtarea]
+    N -->|No| P[Continuar]
+    O --> P
+    P --> Q[Añadir updated_at]
+    Q --> R[update_one con $set]
+    R --> S{Modificado?}
+    S -->|No| T[Log warning - Retornar None]
+    S -->|Sí| U[find_one actualizado]
+    U --> V[_task_doc_to_response]
+    V --> W[Retornar TaskResponse]
+    
+    style A fill:#3b82f6,color:#fff
+    style W fill:#10b981,color:#fff
+    style M fill:#ef4444,color:#fff
+    style D fill:#6b7280,color:#fff
+    style G fill:#6b7280,color:#fff
+```
+
 ##### `delete_task_service(task_id: str) -> bool`
 **Descripción**: Elimina una tarea de la base de datos.  
 **Parámetros**:
 - `task_id`: ID de la tarea a eliminar.
 
 **Retorna**: `True` si se eliminó correctamente, `False` si no se encontró.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[delete_task_service] --> B[validate_object_id]
+    B --> C{ObjectId válido?}
+    C -->|No| D[Log warning - Retornar False]
+    C -->|Sí| E[delete_one con ObjectId]
+    E --> F{deleted_count > 0?}
+    F -->|Sí| G[Log info - Retornar True]
+    F -->|No| H[Log info - Retornar False]
+    
+    style A fill:#3b82f6,color:#fff
+    style G fill:#10b981,color:#fff
+    style D fill:#f59e0b,color:#fff
+    style H fill:#6b7280,color:#fff
+```
+
+---
+
+### `app/api/ai.py`
+
+**Descripción**: Rutas FastAPI para generación de tareas con IA usando Gemini.
+
+#### Router
+
+- **Prefijo**: `/ai`
+- **Tags**: `["ai"]` (para documentación Swagger)
+
+#### Endpoints
+
+##### `POST /ai/generate-task`
+**Descripción**: Genera una tarea estructurada usando IA basándose en el título y descripción.  
+**Parámetros**:
+- `payload: AITaskRequest`: Objeto con `title` (obligatorio) y `description` (opcional).
+
+**Retorna**: `AITaskResponse` con la tarea estructurada (status 200).
+
+**Lanza**:
+- `HTTPException` (500): Si no se puede generar la tarea o `GEMINI_API_KEY` no está configurada.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[POST /ai/generate-task] --> B[Recibir AITaskRequest]
+    B --> C[Validar con Pydantic]
+    C --> D{Validación OK?}
+    D -->|No| E[HTTPException 422]
+    D -->|Sí| F[generate_task_with_ai]
+    F --> G{Tarea generada?}
+    G -->|No| H[HTTPException 500]
+    G -->|Sí| I[Retornar AITaskResponse 200]
+    
+    style A fill:#3b82f6,color:#fff
+    style I fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+    style H fill:#ef4444,color:#fff
+```
+
+> [!NOTE]
+> La IA analiza el título y descripción proporcionados y genera automáticamente:
+> - Descripción detallada
+> - Fechas de inicio y fin (ISO 8601)
+> - Horas estimadas
+> - Subtareas relacionadas (si la tarea es compleja)
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[generate_task_with_ai] --> B{GEMINI_API_KEY configurada?}
+    B -->|No| C[Log error - Retornar None]
+    B -->|Sí| D[Obtener fecha actual]
+    D --> E[Construir prompt con título/descripción]
+    E --> F[Generar contenido con Gemini]
+    F --> G{Respuesta exitosa?}
+    G -->|No| H[Log error - Retornar None]
+    G -->|Sí| I[Extraer JSON de respuesta]
+    I --> J[Limpiar markdown/texto adicional]
+    J --> K[Parsear JSON]
+    K --> L{JSON válido?}
+    L -->|No| M[Log error JSON - Retornar None]
+    L -->|Sí| N[Validar fechas]
+    N --> O{endDateTime > startDateTime?}
+    O -->|No| P[Ajustar endDateTime]
+    O -->|Sí| Q[Continuar]
+    P --> R{startDateTime futura?}
+    Q --> R
+    R -->|No| S[Ajustar a mañana]
+    R -->|Sí| T[Validar estimatedHours]
+    S --> T
+    T --> U{estimatedHours > 0?}
+    U -->|No| V[Ajustar a 1.0]
+    U -->|Sí| W[Validar subtareas]
+    V --> W
+    W --> X[Filtrar subtareas válidas]
+    X --> Y[Crear AITaskResponse]
+    Y --> Z[Retornar respuesta]
+    
+    style A fill:#3b82f6,color:#fff
+    style Z fill:#10b981,color:#fff
+    style C fill:#ef4444,color:#fff
+    style H fill:#ef4444,color:#fff
+    style M fill:#ef4444,color:#fff
+```
 
 ---
 
@@ -371,6 +733,25 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 **Lanza**:
 - `HTTPException` (400): Si no se pudo crear la tarea.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[POST /tasks/] --> B[Recibir TaskCreate]
+    B --> C[Validar con Pydantic]
+    C --> D{Validación OK?}
+    D -->|No| E[HTTPException 422]
+    D -->|Sí| F[create_task_service]
+    F --> G{Tarea creada?}
+    G -->|No| H[HTTPException 400]
+    G -->|Sí| I[Retornar TaskResponse 201]
+    
+    style A fill:#3b82f6,color:#fff
+    style I fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+    style H fill:#ef4444,color:#fff
+```
+
 ##### `GET /tasks/{task_id}`
 **Descripción**: Obtiene una tarea por su ID.  
 **Parámetros**:
@@ -381,6 +762,21 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 **Lanza**:
 - `HTTPException` (404): Si la tarea no se encuentra.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[GET /tasks/task_id] --> B[Recibir task_id]
+    B --> C[get_task_by_id_service]
+    C --> D{Tarea encontrada?}
+    D -->|No| E[HTTPException 404]
+    D -->|Sí| F[Retornar TaskResponse 200]
+    
+    style A fill:#3b82f6,color:#fff
+    style F fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+```
+
 ##### `GET /tasks/`
 **Descripción**: Obtiene todas las tareas con filtros opcionales y paginación.  
 **Query Parameters**:
@@ -389,6 +785,22 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 - `limit: int`: Número máximo de documentos (mínimo: 1, máximo: 1000).
 
 **Retorna**: Lista de `TaskResponse` (status 200).
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[GET /tasks/] --> B[Recibir query params]
+    B --> C[Validar skip >= 0, limit 1-1000]
+    C --> D{Validación OK?}
+    D -->|No| E[HTTPException 422]
+    D -->|Sí| F[get_all_tasks_service]
+    F --> G[Retornar List[TaskResponse] 200]
+    
+    style A fill:#3b82f6,color:#fff
+    style G fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+```
 
 ##### `PUT /tasks/{task_id}`
 **Descripción**: Actualiza una tarea existente.  
@@ -401,6 +813,25 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 **Lanza**:
 - `HTTPException` (404): Si la tarea no se encuentra o los datos son inválidos.
 
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[PUT /tasks/task_id] --> B[Recibir task_id y TaskUpdate]
+    B --> C[Validar TaskUpdate con Pydantic]
+    C --> D{Validación OK?}
+    D -->|No| E[HTTPException 422]
+    D -->|Sí| F[update_task_service]
+    F --> G{Tarea actualizada?}
+    G -->|No| H[HTTPException 404]
+    G -->|Sí| I[Retornar TaskResponse 200]
+    
+    style A fill:#3b82f6,color:#fff
+    style I fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+    style H fill:#ef4444,color:#fff
+```
+
 ##### `DELETE /tasks/{task_id}`
 **Descripción**: Elimina una tarea.  
 **Parámetros**:
@@ -410,6 +841,21 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
 
 **Lanza**:
 - `HTTPException` (404): Si la tarea no se encuentra.
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[DELETE /tasks/task_id] --> B[Recibir task_id]
+    B --> C[delete_task_service]
+    C --> D{Tarea eliminada?}
+    D -->|No| E[HTTPException 404]
+    D -->|Sí| F[Retornar 204 No Content]
+    
+    style A fill:#3b82f6,color:#fff
+    style F fill:#10b981,color:#fff
+    style E fill:#ef4444,color:#fff
+```
 
 > [!TIP]
 > Puedes probar todos los endpoints usando la documentación interactiva de Swagger en `/docs` cuando el servidor esté ejecutándose.
@@ -478,13 +924,30 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ### Variables de Entorno
 
-Puedes configurar la conexión a MongoDB modificando las variables en `app/db/database.py`:
+La aplicación utiliza un archivo `.env` para la configuración. Crea un archivo `.env` en el directorio `BackEnd` basándote en `.env.example`:
 
-- `MONGODB_URL`: URL de conexión (por defecto: `mongodb://localhost:27017`)
+```bash
+cp .env.example .env
+```
+
+Edita el archivo `.env` con tus valores:
+
+```env
+# Configuración de MongoDB
+MONGODB_URL=mongodb://localhost:27017
+DATABASE_NAME=intellitasker
+
+# API Key de Gemini para generación de tareas con IA
+GEMINI_API_KEY=tu-api-key-aqui
+```
+
+**Variables disponibles**:
+- `MONGODB_URL`: URL de conexión a MongoDB (por defecto: `mongodb://localhost:27017`)
 - `DATABASE_NAME`: Nombre de la base de datos (por defecto: `intellitasker`)
+- `GEMINI_API_KEY`: API Key de Google Gemini para generación de tareas con IA (requerida para funcionalidad de IA)
 
-> [!NOTE]
-> En producción, se recomienda usar variables de entorno o un archivo `.env` para la configuración.
+> [!IMPORTANT]
+> El archivo `.env` no debe ser commiteado al repositorio. Asegúrate de que esté en `.gitignore`.
 
 ---
 

@@ -32,7 +32,7 @@ function TaskList({ tasks, onEditTask, onDeleteTask, onUpdateTask }: TaskListPro
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 xs:gap-5 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6">
       {tasks.map(task => (
         <TaskCard
           key={task.id}
