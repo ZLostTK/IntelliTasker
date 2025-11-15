@@ -3,7 +3,7 @@ Modelos Pydantic para Task y Subtask.
 """
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class SubtaskCreate(BaseModel):
@@ -31,16 +31,14 @@ class TaskCreate(BaseModel):
     completed: bool = False
     subtasks: List[SubtaskCreate] = Field(default_factory=list)
 
-    @field_validator('endDateTime')
-    @classmethod
-    def validate_end_after_start(cls, v, info):
+    @model_validator(mode='after')
+    def validate_end_after_start(self):
         """Valida que endDateTime sea posterior a startDateTime."""
-        if 'startDateTime' in info.data:
-            start = datetime.fromisoformat(info.data['startDateTime'].replace('Z', '+00:00'))
-            end = datetime.fromisoformat(v.replace('Z', '+00:00'))
-            if end <= start:
-                raise ValueError("endDateTime debe ser posterior a startDateTime")
-        return v
+        start = datetime.fromisoformat(self.startDateTime.replace('Z', '+00:00'))
+        end = datetime.fromisoformat(self.endDateTime.replace('Z', '+00:00'))
+        if end <= start:
+            raise ValueError("endDateTime debe ser posterior a startDateTime")
+        return self
 
 
 class TaskUpdate(BaseModel):

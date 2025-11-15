@@ -2,14 +2,14 @@
 Configuración de la conexión a MongoDB usando Motor (async).
 """
 import logging
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Cliente global de MongoDB
 client: Optional[AsyncIOMotorClient] = None
-db = None
+db: Optional[AsyncIOMotorDatabase] = None
 
 # Configuración por defecto
 MONGODB_URL = "mongodb://localhost:27017"

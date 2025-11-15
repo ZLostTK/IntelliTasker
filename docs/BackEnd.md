@@ -493,7 +493,6 @@ Puedes configurar la conexión a MongoDB modificando las variables en `app/db/da
 Una vez que el servidor esté ejecutándose, puedes acceder a:
 
 - **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
 
 ---
 

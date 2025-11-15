@@ -40,11 +40,15 @@ async def lifespan(app: FastAPI):
 
 
 # Crear aplicación FastAPI
+# Nota: ReDoc está deshabilitado debido a un error conocido con Pydantic v2
+# que causa "Identifier already declared". Swagger UI funciona correctamente.
 app = FastAPI(
     title="IntelliTasker API",
     description="API backend para gestión de tareas con FastAPI y MongoDB",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs",  # Swagger UI - funciona correctamente
+    redoc_url=None  # ReDoc deshabilitado debido a error conocido
 )
 
 # Configurar CORS para permitir conexiones desde el frontend
