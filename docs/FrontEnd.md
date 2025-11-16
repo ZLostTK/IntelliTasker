@@ -412,9 +412,9 @@ flowchart TD
     M --> N
     N --> O[fetchApi con endpoint]
     O --> P{Respuesta OK?}
-    P -->|Sí| Q[Retornar Task[]]
+    P -->|Sí| Q[Retornar Tasks]
     P -->|No| R[Lanzar Error]
-    
+
     style A fill:#3b82f6,color:#fff
     style Q fill:#10b981,color:#fff
     style R fill:#ef4444,color:#fff

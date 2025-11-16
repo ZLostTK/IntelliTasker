@@ -834,8 +834,8 @@ flowchart TD
     D -->|No| E[HTTPException 422]
     D -->|Sí| F[get_all_tasks_service con parámetros]
     F --> G[Aplicar filtros y ordenamiento]
-    G --> H[Retornar List[TaskResponse] 200]
-    
+    G --> H[Retornar lista TaskResponse 200]
+
     style A fill:#3b82f6,color:#fff
     style H fill:#10b981,color:#fff
     style E fill:#ef4444,color:#fff
@@ -978,7 +978,6 @@ MONGODB_URL=mongodb://localhost:27017
 DATABASE_NAME=intellitasker
 
 # API Key de Gemini para generación de tareas con IA
-GEMINI_API_KEY=tu-api-key-aqui
 ```
 
 **Variables disponibles**:
