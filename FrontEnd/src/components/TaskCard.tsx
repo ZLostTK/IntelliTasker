@@ -146,63 +146,103 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
 
             <button
               onClick={() => setShowSubtasks(!showSubtasks)}
-              className={`flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors w-full justify-center py-2 ${
-                isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
+              className={`flex items-center justify-between gap-2 text-xs sm:text-sm font-medium transition-all duration-200 w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg ${
+                isDark
+                  ? showSubtasks
+                    ? 'bg-blue-900/30 text-blue-300 hover:bg-blue-900/50 border border-blue-800'
+                    : 'bg-slate-700/50 text-blue-400 hover:bg-slate-700 border border-slate-600'
+                  : showSubtasks
+                    ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                    : 'bg-slate-100 text-blue-600 hover:bg-slate-200 border border-slate-300'
               }`}
+              aria-label={showSubtasks ? 'Ocultar subtareas' : 'Mostrar subtareas'}
+              aria-expanded={showSubtasks}
             >
-              {showSubtasks ? <ChevronUp size={16} className="sm:w-4 sm:h-4" /> : <ChevronDown size={16} className="sm:w-4 sm:h-4" />}
-              <span>{showSubtasks ? 'Ocultar' : 'Ver'} subtareas ({totalSubtasks})</span>
+              <div className="flex items-center gap-2">
+                {showSubtasks ? (
+                  <ChevronUp size={18} className="sm:w-5 sm:h-5 transition-transform" />
+                ) : (
+                  <ChevronDown size={18} className="sm:w-5 sm:h-5 transition-transform" />
+                )}
+                <span className="font-semibold">
+                  {showSubtasks ? 'Ocultar' : 'Ver'} subtareas
+                </span>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                isDark
+                  ? showSubtasks
+                    ? 'bg-blue-800 text-blue-200'
+                    : 'bg-slate-600 text-slate-300'
+                  : showSubtasks
+                    ? 'bg-blue-200 text-blue-800'
+                    : 'bg-slate-300 text-slate-700'
+              }`}>
+                {totalSubtasks}
+              </span>
             </button>
           </>
         )}
       </div>
 
-      {showSubtasks && totalSubtasks > 0 && (
-        <div className={`border-t p-3 sm:p-4 ${
-          isDark
-            ? 'border-slate-700 bg-slate-700/50'
-            : 'border-slate-200 bg-slate-50'
-        }`}>
-          <div className="space-y-2">
-            {task.subtasks.map(subtask => (
-              <div
-                key={subtask.id}
-                className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-colors ${
-                  isDark
-                    ? 'bg-slate-700 border-slate-600 hover:border-slate-500'
-                    : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <button
-                  onClick={() => toggleSubtask(subtask.id)}
-                  className={`flex-shrink-0 transition-colors ${
-                    isDark ? 'text-slate-300 hover:text-green-400' : 'text-slate-400 hover:text-green-600'
-                  }`}
-                  aria-label={subtask.completed ? 'Marcar subtarea como pendiente' : 'Marcar subtarea como completada'}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          showSubtasks ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        {totalSubtasks > 0 && (
+          <div className={`border-t p-3 sm:p-4 lg:p-5 ${
+            isDark
+              ? 'border-slate-700 bg-slate-700/50'
+              : 'border-slate-200 bg-slate-50'
+          }`}>
+            <div className="space-y-2 sm:space-y-2.5">
+              {task.subtasks.map((subtask, index) => (
+                <div
+                  key={subtask.id}
+                  className={`flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 lg:p-3.5 rounded-lg border transition-all duration-200 ${
+                    isDark
+                      ? 'bg-slate-700 border-slate-600 hover:border-slate-500 hover:bg-slate-700/80'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  } ${showSubtasks ? 'animate-fade-in-up' : ''}`}
+                  style={{
+                    animationDelay: showSubtasks ? `${index * 50}ms` : '0ms'
+                  }}
                 >
-                  {subtask.completed ? (
-                    <CheckCircle2 size={18} className="sm:w-5 sm:h-5 text-green-500" />
-                  ) : (
-                    <Circle size={18} className="sm:w-5 sm:h-5" />
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs sm:text-sm font-medium truncate ${
-                    subtask.completed
-                      ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
-                      : isDark ? 'text-white' : 'text-slate-900'
+                  <button
+                    onClick={() => toggleSubtask(subtask.id)}
+                    className={`flex-shrink-0 transition-all duration-200 active:scale-95 ${
+                      isDark ? 'text-slate-300 hover:text-green-400' : 'text-slate-400 hover:text-green-600'
+                    }`}
+                    aria-label={subtask.completed ? 'Marcar subtarea como pendiente' : 'Marcar subtarea como completada'}
+                  >
+                    {subtask.completed ? (
+                      <CheckCircle2 size={20} className="sm:w-6 sm:h-6 text-green-500" />
+                    ) : (
+                      <Circle size={20} className="sm:w-6 sm:h-6" />
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs sm:text-sm lg:text-base font-medium break-words ${
+                      subtask.completed
+                        ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
+                        : isDark ? 'text-white' : 'text-slate-900'
+                    }`}>
+                      {subtask.title}
+                    </p>
+                  </div>
+                  <span className={`flex-shrink-0 text-xs sm:text-sm font-semibold px-2 py-1 rounded ${
+                    isDark
+                      ? 'bg-slate-600 text-slate-200'
+                      : 'bg-slate-200 text-slate-700'
                   }`}>
-                    {subtask.title}
-                  </p>
+                    {subtask.estimatedHours}h
+                  </span>
                 </div>
-                <span className={`flex-shrink-0 text-xs font-medium ${isDark ? 'text-slate-300' : 'text-slate-500'}`}>
-                  {subtask.estimatedHours}h
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
