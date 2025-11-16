@@ -506,41 +506,73 @@ flowchart TD
     style H fill:#6b7280,color:#fff
 ```
 
-##### `get_all_tasks_service(completed: Optional[bool] = None, skip: int = 0, limit: int = 100) -> List[TaskResponse]`
-**Descripción**: Obtiene todas las tareas con filtros opcionales y paginación.  
+##### `get_all_tasks_service(completed: Optional[bool] = None, sort_by: Optional[str] = None, filter_by: Optional[str] = None, search: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[TaskResponse]`
+**Descripción**: Obtiene todas las tareas con filtros opcionales, ordenamiento avanzado y búsqueda de texto.  
 **Parámetros**:
-- `completed`: Filtrar por estado de completado (opcional).
+- `completed`: Filtrar por estado de completado (opcional, compatibilidad con API anterior).
+- `sort_by`: Opción de ordenamiento ('recent', 'oldest', 'dueDate', 'title', 'progress', 'duration').
+- `filter_by`: Opción de filtrado ('all', 'completed', 'inProgress', 'overdue', 'today').
+- `search`: Texto para buscar en título y descripción usando expresiones regulares (opcional).
 - `skip`: Número de documentos a saltar (por defecto: 0).
 - `limit`: Número máximo de documentos a retornar (por defecto: 100).
 
 **Retorna**: Lista de `TaskResponse`.
 
+**Opciones de ordenamiento**:
+- `'recent'`: Por fecha de creación descendente (más recientes primero)
+- `'oldest'`: Por fecha de creación ascendente (más antiguas primero)
+- `'dueDate'`: Por fecha de vencimiento ascendente (próximas a vencer primero)
+- `'title'`: Alfabéticamente por título
+- `'progress'`: Por porcentaje de progreso (calculado en memoria después de obtener documentos)
+- `'duration'`: Por horas estimadas descendente
+
+**Opciones de filtrado**:
+- `'all'`: Sin filtro (todas las tareas)
+- `'completed'`: Solo tareas completadas
+- `'inProgress'`: Solo tareas en progreso (no completadas)
+- `'overdue'`: Solo tareas vencidas (endDateTime < ahora)
+- `'today'`: Tareas que ocurren hoy (basado en startDateTime y endDateTime)
+
 **Efectos secundarios**:
-- Ordena los resultados por `created_at` descendente.
+- Ordena los resultados según `sort_by` (por defecto: `created_at` descendente).
+- Aplica filtros MongoDB para `filter_by` y `search`.
+- El ordenamiento por `progress` se realiza en memoria después de obtener los documentos.
 
 **Diagrama de flujo**:
 
 ```mermaid
 flowchart TD
     A[get_all_tasks_service] --> B[Recibir parámetros]
-    B --> C{completed proporcionado?}
-    C -->|Sí| D[Crear filtro con completed]
-    C -->|No| E[Filtro vacío]
-    D --> F[find con filtro]
+    B --> C[Inicializar filter_query]
+    C --> D{completed proporcionado?}
+    D -->|Sí| E[Añadir completed al filtro]
+    D -->|No| F[Continuar]
     E --> F
-    F --> G[sort por created_at desc]
-    G --> H[skip documentos]
-    H --> I[limit resultados]
-    I --> J[to_list]
-    J --> K{Documentos encontrados?}
-    K -->|Sí| L[Iterar documentos]
-    K -->|No| M[Retornar lista vacía]
-    L --> N[_task_doc_to_response para cada uno]
-    N --> O[Retornar List[TaskResponse]]
+    F --> G{filter_by proporcionado?}
+    G -->|Sí| H[Aplicar filtro avanzado]
+    G -->|No| I[Continuar]
+    H --> I
+    I --> J{search proporcionado?}
+    J -->|Sí| K[Añadir búsqueda regex]
+    J -->|No| L[Continuar]
+    K --> L
+    L --> M[Construir cursor con filtros]
+    M --> N{sort_by proporcionado?}
+    N -->|Sí| O[Aplicar ordenamiento MongoDB]
+    N -->|No| P[Ordenar por created_at desc]
+    O --> Q[skip y limit]
+    P --> Q
+    Q --> R[to_list documentos]
+    R --> S[Convertir a TaskResponse]
+    S --> T{sort_by es 'progress'?}
+    T -->|Sí| U[Ordenar por progreso en memoria]
+    T -->|No| V[Retornar lista]
+    U --> V
     
     style A fill:#3b82f6,color:#fff
-    style O fill:#10b981,color:#fff
-    style M fill:#6b7280,color:#fff
+    style V fill:#10b981,color:#fff
+    style H fill:#f59e0b,color:#fff
+    style K fill:#f59e0b,color:#fff
 ```
 
 ##### `update_task_service(task_id: str, task_update: TaskUpdate) -> Optional[TaskResponse]`
@@ -778,13 +810,19 @@ flowchart TD
 ```
 
 ##### `GET /tasks/`
-**Descripción**: Obtiene todas las tareas con filtros opcionales y paginación.  
+**Descripción**: Obtiene todas las tareas con filtros opcionales, ordenamiento avanzado, búsqueda y paginación.  
 **Query Parameters**:
-- `completed: Optional[bool]`: Filtrar por estado de completado.
+- `completed: Optional[bool]`: Filtrar por estado de completado (compatibilidad con API anterior).
+- `sortBy: Optional[str]`: Ordenamiento ('recent', 'oldest', 'dueDate', 'title', 'progress', 'duration').
+- `filterBy: Optional[str]`: Filtro ('all', 'completed', 'inProgress', 'overdue', 'today').
+- `search: Optional[str]`: Búsqueda de texto en título y descripción.
 - `skip: int`: Número de documentos a saltar (mínimo: 0).
 - `limit: int`: Número máximo de documentos (mínimo: 1, máximo: 1000).
 
 **Retorna**: Lista de `TaskResponse` (status 200).
+
+> [!TIP]
+> Puedes combinar múltiples parámetros. Por ejemplo: `GET /tasks/?sortBy=dueDate&filterBy=inProgress&search=curso` para obtener tareas en progreso que contengan "curso", ordenadas por fecha de vencimiento.
 
 **Diagrama de flujo**:
 
@@ -794,12 +832,14 @@ flowchart TD
     B --> C[Validar skip >= 0, limit 1-1000]
     C --> D{Validación OK?}
     D -->|No| E[HTTPException 422]
-    D -->|Sí| F[get_all_tasks_service]
-    F --> G[Retornar List[TaskResponse] 200]
+    D -->|Sí| F[get_all_tasks_service con parámetros]
+    F --> G[Aplicar filtros y ordenamiento]
+    G --> H[Retornar List[TaskResponse] 200]
     
     style A fill:#3b82f6,color:#fff
-    style G fill:#10b981,color:#fff
+    style H fill:#10b981,color:#fff
     style E fill:#ef4444,color:#fff
+    style G fill:#f59e0b,color:#fff
 ```
 
 ##### `PUT /tasks/{task_id}`

@@ -47,13 +47,23 @@ async def get_task(task_id: str):
 @router.get("/", response_model=List[TaskResponse], status_code=200)
 async def get_tasks(
     completed: Optional[bool] = Query(None, description="Filtrar por estado de completado"),
+    sortBy: Optional[str] = Query(None, description="Ordenamiento: recent, oldest, dueDate, title, progress, duration"),
+    filterBy: Optional[str] = Query(None, description="Filtro: all, completed, inProgress, overdue, today"),
+    search: Optional[str] = Query(None, description="Búsqueda de texto en título y descripción"),
     skip: int = Query(0, ge=0, description="Número de documentos a saltar"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de documentos")
 ):
     """
-    Obtiene todas las tareas con filtros opcionales.
+    Obtiene todas las tareas con filtros opcionales y ordenamiento.
     """
-    tasks = await get_all_tasks_service(completed=completed, skip=skip, limit=limit)
+    tasks = await get_all_tasks_service(
+        completed=completed,
+        sort_by=sortBy,
+        filter_by=filterBy,
+        search=search,
+        skip=skip,
+        limit=limit
+    )
     return tasks
 
 

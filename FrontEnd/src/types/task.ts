@@ -14,4 +14,6 @@ export interface Task {
   estimatedHours: number;
   completed: boolean;
   subtasks: Subtask[];
+  created_at?: string;
+  updated_at?: string;
 }

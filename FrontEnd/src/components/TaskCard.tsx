@@ -49,14 +49,14 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
   };
 
   return (
-    <div className={`rounded-xl shadow-sm border transition-all overflow-hidden hover:shadow-lg ${
+    <div className={`rounded-xl shadow-sm border transition-all overflow-hidden hover:shadow-lg h-full flex flex-col ${
       isDark
         ? 'bg-slate-800 border-slate-700'
         : 'bg-white border-slate-200'
     }`}>
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3 flex-1 mr-2">
+      <div className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
+        <div className="flex items-start justify-between mb-3 lg:mb-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-1 mr-2 min-w-0">
             {totalSubtasks === 0 && (
               <button
                 onClick={toggleTaskCompletion}
@@ -67,13 +67,13 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
                 aria-label={task.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
               >
                 {task.completed ? (
-                  <CheckCircle2 size={24} className="text-green-500" />
+                  <CheckCircle2 size={20} className="sm:w-6 sm:h-6 text-green-500" />
                 ) : (
-                  <Circle size={24} />
+                  <Circle size={20} className="sm:w-6 sm:h-6" />
                 )}
               </button>
             )}
-            <h3 className={`text-lg font-bold flex-1 ${
+            <h3 className={`text-base sm:text-lg font-bold flex-1 truncate ${
               isTaskCompleted
                 ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
                 : isDark ? 'text-white' : 'text-slate-900'
@@ -81,45 +81,45 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
               {task.title}
             </h3>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-shrink-0">
             <button
               onClick={() => onEdit(task)}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                 isDark
                   ? 'text-slate-300 hover:bg-slate-700 hover:text-white'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
               aria-label="Editar tarea"
             >
-              <Edit2 size={16} />
+              <Edit2 size={16} className="sm:w-4 sm:h-4" />
             </button>
             <button
               onClick={() => onDelete(task.id)}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-1.5 sm:p-2 rounded-lg transition-colors ${
                 isDark
                   ? 'text-red-400 hover:bg-red-900/30 hover:text-red-300'
                   : 'text-red-600 hover:bg-red-50'
               }`}
               aria-label="Eliminar tarea"
             >
-              <Trash2 size={16} />
+              <Trash2 size={16} className="sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
 
         {task.description && (
-          <p className={`text-sm mb-4 line-clamp-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <p className={`text-xs sm:text-sm mb-3 lg:mb-4 line-clamp-2 lg:line-clamp-3 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             {task.description}
           </p>
         )}
 
-        <div className="space-y-2 mb-4">
-          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            <Calendar size={16} />
-            <span>{formatDateTime(task.startDateTime)} - {formatDateTime(task.endDateTime)}</span>
+        <div className="space-y-2 mb-3 lg:mb-4">
+          <div className={`flex items-center gap-2 text-xs sm:text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <Calendar size={14} className="sm:w-4 sm:h-4 flex-shrink-0" />
+            <span className="truncate">{formatDateTime(task.startDateTime)} - {formatDateTime(task.endDateTime)}</span>
           </div>
-          <div className={`flex items-center gap-2 text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-            <Clock size={16} />
+          <div className={`flex items-center gap-2 text-xs sm:text-sm flex-wrap ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            <Clock size={14} className="sm:w-4 sm:h-4 flex-shrink-0" />
             <span className="font-medium">{task.estimatedHours}h estimadas</span>
             {totalSubtasks > 0 && (
               <span className={isDark ? 'text-slate-400' : 'text-slate-400'}>({subtasksHours}h en subtareas)</span>
@@ -129,14 +129,14 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
 
         {totalSubtasks > 0 && (
           <>
-            <div className="mb-4">
-              <div className="flex items-center justify-between text-sm mb-2">
+            <div className="mb-3 lg:mb-4 mt-auto">
+              <div className="flex items-center justify-between text-xs sm:text-sm mb-2">
                 <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Progreso</span>
                 <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {completedSubtasks}/{totalSubtasks}
                 </span>
               </div>
-              <div className={`w-full rounded-full h-2 overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
+              <div className={`w-full rounded-full h-2 sm:h-2.5 overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
                 <div
                   className="bg-green-500 h-full rounded-full transition-all duration-300"
                   style={{ width: `${completionPercentage}%` }}
@@ -146,19 +146,19 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
 
             <button
               onClick={() => setShowSubtasks(!showSubtasks)}
-              className={`flex items-center gap-2 text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2 text-xs sm:text-sm font-medium transition-colors w-full justify-center py-2 ${
                 isDark ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'
               }`}
             >
-              {showSubtasks ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              {showSubtasks ? 'Ocultar' : 'Ver'} subtareas ({totalSubtasks})
+              {showSubtasks ? <ChevronUp size={16} className="sm:w-4 sm:h-4" /> : <ChevronDown size={16} className="sm:w-4 sm:h-4" />}
+              <span>{showSubtasks ? 'Ocultar' : 'Ver'} subtareas ({totalSubtasks})</span>
             </button>
           </>
         )}
       </div>
 
       {showSubtasks && totalSubtasks > 0 && (
-        <div className={`border-t p-4 ${
+        <div className={`border-t p-3 sm:p-4 ${
           isDark
             ? 'border-slate-700 bg-slate-700/50'
             : 'border-slate-200 bg-slate-50'
@@ -167,7 +167,7 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
             {task.subtasks.map(subtask => (
               <div
                 key={subtask.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-colors ${
                   isDark
                     ? 'bg-slate-700 border-slate-600 hover:border-slate-500'
                     : 'bg-white border-slate-200 hover:border-slate-300'
@@ -181,13 +181,13 @@ function TaskCard({ task, onEdit, onDelete, onUpdate }: TaskCardProps) {
                   aria-label={subtask.completed ? 'Marcar subtarea como pendiente' : 'Marcar subtarea como completada'}
                 >
                   {subtask.completed ? (
-                    <CheckCircle2 size={20} className="text-green-500" />
+                    <CheckCircle2 size={18} className="sm:w-5 sm:h-5 text-green-500" />
                   ) : (
-                    <Circle size={20} />
+                    <Circle size={18} className="sm:w-5 sm:h-5" />
                   )}
                 </button>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${
+                  <p className={`text-xs sm:text-sm font-medium truncate ${
                     subtask.completed
                       ? `line-through ${isDark ? 'text-slate-400' : 'text-slate-400'}`
                       : isDark ? 'text-white' : 'text-slate-900'

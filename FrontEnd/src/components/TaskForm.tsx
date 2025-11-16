@@ -22,12 +22,25 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
   const [newSubtaskHours, setNewSubtaskHours] = useState(1);
   const [isAILoading, setIsAILoading] = useState(false);
 
+  // Convertir ISO 8601 a datetime-local
+  const formatDateTimeForInput = (isoString: string): string => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    // Formato: YYYY-MM-DDTHH:mm
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description);
-      setStartDateTime(task.startDateTime);
-      setEndDateTime(task.endDateTime);
+      setStartDateTime(formatDateTimeForInput(task.startDateTime));
+      setEndDateTime(formatDateTimeForInput(task.endDateTime));
       setEstimatedHours(task.estimatedHours);
       setSubtasks(task.subtasks);
     } else {
@@ -48,22 +61,8 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
 
     setIsAILoading(true);
     try {
-      const response = await fetch('http://localhost:8000/ai/generate-task', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al generar tarea con IA');
-      }
-
-      const aiTask = await response.json();
+      const { generateTaskWithAI } = await import('../services/api');
+      const aiTask = await generateTaskWithAI(title.trim(), description.trim() || undefined);
 
       // Rellenar el formulario con los datos generados
       setDescription(aiTask.description || description);
@@ -107,16 +106,28 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
     setSubtasks(subtasks.filter(st => st.id !== subtaskId));
   };
 
+  // Convertir datetime-local a ISO 8601
+  const formatDateTimeForAPI = (dateTimeLocal: string): string => {
+    if (!dateTimeLocal) return '';
+    // datetime-local devuelve formato: "YYYY-MM-DDTHH:mm"
+    // Necesitamos convertirlo a ISO 8601 con timezone
+    const date = new Date(dateTimeLocal);
+    return date.toISOString();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const formattedStartDateTime = formatDateTimeForAPI(startDateTime);
+    const formattedEndDateTime = formatDateTimeForAPI(endDateTime);
 
     if (task) {
       onSave({
         ...task,
         title,
         description,
-        startDateTime,
-        endDateTime,
+        startDateTime: formattedStartDateTime,
+        endDateTime: formattedEndDateTime,
         estimatedHours,
         subtasks,
       });
@@ -124,8 +135,8 @@ function TaskForm({ task, onSave, onClose }: TaskFormProps) {
       onSave({
         title,
         description,
-        startDateTime,
-        endDateTime,
+        startDateTime: formattedStartDateTime,
+        endDateTime: formattedEndDateTime,
         estimatedHours,
         completed: false,
         subtasks,

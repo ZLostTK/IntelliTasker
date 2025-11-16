@@ -4,8 +4,8 @@
 
 Aplicación web desarrollada con React y TypeScript para gestionar tareas y proyectos. Ofrece una interfaz intuitiva con soporte para modo claro y oscuro, múltiples vistas (lista y calendario), y funcionalidades avanzadas de filtrado y ordenamiento.
 
-> [!NOTE]
-> Esta aplicación actualmente almacena las tareas en memoria. Los datos se perderán al recargar la página. La integración con Supabase está preparada para implementación futura.
+> [!IMPORTANT]
+> Esta aplicación está completamente integrada con el Backend de FastAPI + MongoDB. Todas las tareas se persisten en MongoDB y se sincronizan automáticamente con el servidor. El ordenamiento, filtrado y búsqueda se realizan en el backend para optimizar el rendimiento.
 
 ---
 
@@ -45,9 +45,10 @@ Aplicación web desarrollada con React y TypeScript para gestionar tareas y proy
 
 - **Lucide React 0.344.0**: Biblioteca de iconos
 
-### Base de Datos (Preparado para integración)
+### Comunicación con Backend
 
-- **Supabase JS 2.57.4**: Cliente JavaScript para Supabase (preparado para uso futuro)
+- **API Service**: Servicio personalizado (`src/services/api.ts`) para comunicarse con el backend de FastAPI
+- **Fetch API**: Uso nativo de `fetch` para peticiones HTTP
 
 ### Desarrollo
 
@@ -76,6 +77,7 @@ graph TD
     A --> D[TaskFilter - Filtros]
     A --> E[TaskList/CalendarView - Vistas]
     A --> F[TaskForm - Modal]
+    A --> G[API Service - Backend]
     
     C --> C1[Toggle Vista]
     C --> C2[Toggle Tema]
@@ -84,17 +86,26 @@ graph TD
     D --> D1[Filtrado]
     D --> D2[Ordenamiento]
     D --> D3[Búsqueda]
+    D --> G
     
     E --> E1[TaskCard]
     E1 --> E2[Subtareas]
+    E --> G
     
     F --> F1[Crear/Editar]
     F --> F2[Validación]
+    F --> G
+    
+    G --> H[Backend FastAPI]
+    H --> I[MongoDB]
     
     style A fill:#3b82f6
     style B fill:#10b981
     style E fill:#f59e0b
     style F fill:#ef4444
+    style G fill:#8b5cf6
+    style H fill:#f59e0b
+    style I fill:#10b981
 ```
 
 ### Diagrama de Componentes
@@ -106,6 +117,13 @@ graph LR
     App --> TaskList[TaskList.tsx]
     App --> CalendarView[CalendarView.tsx]
     App --> TaskForm[TaskForm.tsx]
+    App --> HomePage[HomePage.tsx]
+    
+    HomePage --> API[api.ts Service]
+    HomePage --> TaskFilter
+    HomePage --> TaskList
+    HomePage --> CalendarView
+    HomePage --> TaskForm
     
     TaskList --> TaskCard[TaskCard.tsx]
     
@@ -113,12 +131,14 @@ graph LR
     TaskCard -.-> ThemeContext
     TaskForm -.-> ThemeContext
     
-    App --> taskSort[taskSort.ts]
-    TaskFilter --> taskSort
+    API --> Backend[Backend FastAPI]
+    Backend --> MongoDB[(MongoDB)]
     
     style App fill:#3b82f6,color:#fff
     style ThemeContext fill:#10b981,color:#fff
-    style taskSort fill:#8b5cf6,color:#fff
+    style API fill:#8b5cf6,color:#fff
+    style Backend fill:#f59e0b,color:#fff
+    style MongoDB fill:#10b981,color:#fff
 ```
 
 ---
@@ -138,7 +158,10 @@ FrontEnd/
 │   │   └── TaskList.tsx     # Lista de tareas
 │   │
 │   ├── pages/               # Páginas de la aplicación
-│   │   └── HomePage.tsx     # Página principal
+│   │   └── HomePage.tsx    # Página principal
+│   │
+│   ├── services/            # Servicios de API
+│   │   └── api.ts           # Servicio de API para conectar con Backend
 │   │
 │   ├── context/             # Contextos de React
 │   │   └── ThemeContext.tsx # Contexto del tema (claro/oscuro)
@@ -147,7 +170,7 @@ FrontEnd/
 │   │   └── task.ts          # Tipos para Task y Subtask
 │   │
 │   ├── utils/               # Funciones utilitarias
-│   │   └── taskSort.ts      # Funciones de ordenamiento y filtrado
+│   │   └── taskSort.ts      # Funciones de ordenamiento y filtrado (legacy)
 │   │
 │   ├── App.tsx              # Componente principal con Router
 │   ├── main.tsx             # Punto de entrada de la aplicación
@@ -184,48 +207,152 @@ FrontEnd/
 
 ### HomePage.tsx
 
-**Descripción**: Página principal de la aplicación que gestiona el estado global y coordina todos los componentes.
+**Descripción**: Página principal de la aplicación que gestiona el estado global, coordina todos los componentes y se comunica con el backend a través del servicio de API.
 
 **Responsabilidades**:
 - Gestiona el estado global de las tareas
+- Carga tareas desde el backend al montar y cuando cambian los filtros
 - Controla la vista activa (lista o calendario)
-- Maneja los filtros, ordenamiento y búsqueda
+- Maneja los filtros, ordenamiento y búsqueda (enviados al backend)
 - Coordina la apertura/cierre del formulario de tareas
+- Realiza operaciones CRUD a través del servicio de API
 
 **Estado Principal**:
 
 ```typescript
-- tasks: Task[]           // Lista de todas las tareas
+- tasks: Task[]           // Lista de todas las tareas (desde backend)
 - isFormOpen: boolean     // Estado del modal de formulario
 - editingTask: Task | null // Tarea en edición
 - view: 'list' | 'calendar' // Vista activa
 - sortBy: SortOption      // Opción de ordenamiento
 - filterBy: FilterOption  // Opción de filtro
 - searchQuery: string     // Texto de búsqueda
+- isLoading: boolean      // Estado de carga
+- error: string | null    // Mensaje de error
 ```
 
 **Funciones Clave**:
 
-#### `handleCreateTask(task: Omit<Task, 'id'>): void`
-**Descripción**: Crea una nueva tarea y la agrega al estado.  
-**Parámetros**:
-- `task`: Objeto de tarea sin el campo `id` (se genera automáticamente).  
-**Retorna**: `void`  
-**Efectos**: Actualiza el estado `tasks` y cierra el formulario.
+#### `loadTasks(): Promise<void>`
+**Descripción**: Carga las tareas desde el backend aplicando filtros, ordenamiento y búsqueda.  
+**Parámetros**: Ninguno  
+**Retorna**: `Promise<void>`  
+**Efectos**: 
+- Actualiza `isLoading` durante la carga
+- Actualiza `tasks` con los datos del backend
+- Actualiza `error` si hay algún problema
+- Se ejecuta automáticamente al montar y cuando cambian `sortBy`, `filterBy` o `searchQuery`
 
-#### `handleUpdateTask(updatedTask: Task): void`
-**Descripción**: Actualiza una tarea existente en el estado.  
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[loadTasks] --> B[setIsLoading true]
+    B --> C[setError null]
+    C --> D[Convertir filterBy a formato backend]
+    D --> E[Llamar api.getTasks con parámetros]
+    E --> F{Respuesta exitosa?}
+    F -->|Sí| G[setTasks con datos]
+    F -->|No| H[handleApiError]
+    H --> I[setError con mensaje]
+    I --> J[setIsLoading false]
+    G --> J
+    J --> K[Actualizar UI]
+    
+    style A fill:#3b82f6,color:#fff
+    style G fill:#10b981,color:#fff
+    style H fill:#ef4444,color:#fff
+    style K fill:#10b981,color:#fff
+```
+
+#### `handleCreateTask(task: Omit<Task, 'id'>): Promise<void>`
+**Descripción**: Crea una nueva tarea en el backend y actualiza el estado local.  
+**Parámetros**:
+- `task`: Objeto de tarea sin el campo `id` (se genera en el backend).  
+**Retorna**: `Promise<void>`  
+**Efectos**: 
+- Llama a `api.createTask()` para persistir en MongoDB
+- Actualiza el estado `tasks` con la nueva tarea
+- Cierra el formulario
+- Muestra error si falla
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[handleCreateTask] --> B[setError null]
+    B --> C[api.createTask]
+    C --> D{Respuesta exitosa?}
+    D -->|Sí| E[setTasks con nueva tarea]
+    E --> F[setIsFormOpen false]
+    D -->|No| G[handleApiError]
+    G --> H[setError con mensaje]
+    H --> I[alert con error]
+    
+    style A fill:#3b82f6,color:#fff
+    style E fill:#10b981,color:#fff
+    style G fill:#ef4444,color:#fff
+```
+
+#### `handleUpdateTask(updatedTask: Task): Promise<void>`
+**Descripción**: Actualiza una tarea existente en el backend y actualiza el estado local.  
 **Parámetros**:
 - `updatedTask`: Tarea completa con los cambios aplicados.  
-**Retorna**: `void`  
-**Efectos**: Actualiza la tarea en el array `tasks` y cierra el formulario.
+**Retorna**: `Promise<void>`  
+**Efectos**: 
+- Llama a `api.updateTask()` para persistir cambios en MongoDB
+- Actualiza la tarea en el array `tasks`
+- Cierra el formulario
+- Muestra error si falla
 
-#### `handleDeleteTask(taskId: string): void`
-**Descripción**: Elimina una tarea del estado.  
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[handleUpdateTask] --> B[setError null]
+    B --> C[Preparar taskData sin id]
+    C --> D[api.updateTask]
+    D --> E{Respuesta exitosa?}
+    E -->|Sí| F[Actualizar tarea en tasks]
+    F --> G[setEditingTask null]
+    G --> H[setIsFormOpen false]
+    E -->|No| I[handleApiError]
+    I --> J[alert con error]
+    
+    style A fill:#3b82f6,color:#fff
+    style F fill:#10b981,color:#fff
+    style I fill:#ef4444,color:#fff
+```
+
+#### `handleDeleteTask(taskId: string): Promise<void>`
+**Descripción**: Elimina una tarea del backend y actualiza el estado local.  
 **Parámetros**:
 - `taskId`: Identificador único de la tarea a eliminar.  
-**Retorna**: `void`  
-**Efectos**: Filtra la tarea del array `tasks`.
+**Retorna**: `Promise<void>`  
+**Efectos**: 
+- Muestra confirmación al usuario
+- Llama a `api.deleteTask()` para eliminar de MongoDB
+- Filtra la tarea del array `tasks`
+- Muestra error si falla
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[handleDeleteTask] --> B{confirm eliminación?}
+    B -->|No| C[Cancelar]
+    B -->|Sí| D[setError null]
+    D --> E[api.deleteTask]
+    E --> F{Respuesta exitosa?}
+    F -->|Sí| G[Filtrar tarea de tasks]
+    F -->|No| H[handleApiError]
+    H --> I[alert con error]
+    
+    style A fill:#3b82f6,color:#fff
+    style G fill:#10b981,color:#fff
+    style H fill:#ef4444,color:#fff
+    style C fill:#6b7280,color:#fff
+```
 
 #### `handleEditTask(task: Task): void`
 **Descripción**: Abre el formulario en modo edición con la tarea seleccionada.  
@@ -235,7 +362,134 @@ FrontEnd/
 **Efectos**: Establece `editingTask` y abre el formulario.
 
 > [!IMPORTANT]
-> Los IDs de tareas se generan usando `Date.now().toString()`. Para producción, se recomienda usar UUIDs para evitar colisiones.
+> Todas las operaciones CRUD se realizan a través del servicio de API (`src/services/api.ts`) que se comunica con el backend de FastAPI. Las tareas se persisten en MongoDB y los IDs se generan automáticamente por el backend.
+
+---
+
+### `src/services/api.ts`
+
+**Descripción**: Servicio centralizado para todas las comunicaciones con el backend de FastAPI. Proporciona funciones tipadas para operaciones CRUD y generación con IA.
+
+**Configuración**:
+- URL base: `import.meta.env.VITE_API_URL` o `http://localhost:8000` por defecto
+- Headers: `Content-Type: application/json` automático
+- Manejo de errores: Convierte errores de API a mensajes legibles
+
+**Funciones Exportadas**:
+
+#### `getTasks(params?: GetTasksParams): Promise<Task[]>`
+**Descripción**: Obtiene todas las tareas con filtros opcionales, ordenamiento y búsqueda.  
+**Parámetros**:
+- `params.completed`: Filtrar por estado de completado
+- `params.sortBy`: Ordenamiento ('recent', 'oldest', 'dueDate', 'title', 'progress', 'duration')
+- `params.filterBy`: Filtro ('all', 'completed', 'inProgress', 'overdue', 'today')
+- `params.search`: Texto para buscar en título y descripción
+- `params.skip`: Número de documentos a saltar
+- `params.limit`: Número máximo de documentos
+
+**Retorna**: `Promise<Task[]>` con las tareas del backend
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[getTasks] --> B[Construir queryParams]
+    B --> C{completed?}
+    C -->|Sí| D[Añadir completed]
+    C -->|No| E[Continuar]
+    D --> E
+    E --> F{sortBy?}
+    F -->|Sí| G[Añadir sortBy]
+    F -->|No| H[Continuar]
+    G --> H
+    H --> I{filterBy?}
+    I -->|Sí| J[Añadir filterBy]
+    I -->|No| K[Continuar]
+    J --> K
+    K --> L{search?}
+    L -->|Sí| M[Añadir search]
+    L -->|No| N[Continuar]
+    M --> N
+    N --> O[fetchApi con endpoint]
+    O --> P{Respuesta OK?}
+    P -->|Sí| Q[Retornar Task[]]
+    P -->|No| R[Lanzar Error]
+    
+    style A fill:#3b82f6,color:#fff
+    style Q fill:#10b981,color:#fff
+    style R fill:#ef4444,color:#fff
+```
+
+#### `createTask(taskData: Omit<Task, 'id'>): Promise<Task>`
+**Descripción**: Crea una nueva tarea en el backend.  
+**Parámetros**:
+- `taskData`: Datos de la tarea sin `id`, `created_at` ni `updated_at`
+
+**Retorna**: `Promise<Task>` con la tarea creada (incluye ID generado por backend)
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[createTask] --> B[fetchApi POST /tasks/]
+    B --> C[Enviar taskData como JSON]
+    C --> D{Respuesta 201?}
+    D -->|Sí| E[Retornar Task con ID]
+    D -->|No| F[Lanzar Error]
+    
+    style A fill:#3b82f6,color:#fff
+    style E fill:#10b981,color:#fff
+    style F fill:#ef4444,color:#fff
+```
+
+#### `updateTask(taskId: string, taskData: Partial<Task>): Promise<Task>`
+**Descripción**: Actualiza una tarea existente en el backend.  
+**Parámetros**:
+- `taskId`: ID de la tarea a actualizar
+- `taskData`: Campos a actualizar (parcial)
+
+**Retorna**: `Promise<Task>` con la tarea actualizada
+
+#### `deleteTask(taskId: string): Promise<void>`
+**Descripción**: Elimina una tarea del backend.  
+**Parámetros**:
+- `taskId`: ID de la tarea a eliminar
+
+**Retorna**: `Promise<void>` (204 No Content)
+
+#### `generateTaskWithAI(title: string, description?: string): Promise<Task>`
+**Descripción**: Genera una tarea estructurada usando IA (Gemini).  
+**Parámetros**:
+- `title`: Título de la tarea (requerido)
+- `description`: Descripción opcional
+
+**Retorna**: `Promise<Task>` con la tarea generada por IA
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[generateTaskWithAI] --> B[Validar título no vacío]
+    B --> C[fetchApi POST /ai/generate-task]
+    C --> D[Enviar title y description]
+    D --> E{Respuesta 200?}
+    E -->|Sí| F[Retornar Task generada]
+    E -->|No| G[Lanzar Error]
+    
+    style A fill:#3b82f6,color:#fff
+    style F fill:#10b981,color:#fff
+    style G fill:#ef4444,color:#fff
+```
+
+#### `handleApiError(error: unknown): string`
+**Descripción**: Convierte errores de la API a mensajes legibles para el usuario.  
+**Parámetros**:
+- `error`: Error capturado (puede ser Error, objeto con `detail`, etc.)
+
+**Retorna**: `string` con el mensaje de error formateado
+
+> [!TIP]
+> Todas las funciones del servicio de API manejan automáticamente los errores HTTP y los convierten en excepciones con mensajes descriptivos. Usa `try/catch` en los componentes para manejar estos errores.
 
 ---
 
@@ -289,7 +543,8 @@ interface TaskListProps {
 **Funcionalidades**:
 - Renderiza un grid de tarjetas de tareas
 - Muestra mensaje cuando no hay tareas
-- Responsive: 1 columna en móvil, 2 en tablet, 3 en desktop
+- Responsive: 1 columna en móvil, 2 en tablet, 3 en desktop, máximo 4 en pantallas muy grandes
+- Cards con altura uniforme usando flexbox
 
 **Parámetros**:
 - `tasks`: Array de tareas a mostrar.
@@ -403,15 +658,45 @@ interface TaskFormProps {
 **Parámetros**: Ninguno  
 **Retorna**: `Promise<void>`  
 **Efectos**: 
-- Llama al endpoint `/ai/generate-task` del backend
+- Llama a `api.generateTaskWithAI()` que se comunica con el backend
 - Rellena automáticamente los campos del formulario con los datos generados
 - Genera subtareas si la tarea es compleja
+- Muestra error si falla la generación
+
+**Diagrama de flujo**:
+
+```mermaid
+flowchart TD
+    A[handleGenerateWithAI] --> B{title.trim válido?}
+    B -->|No| C[Retornar sin hacer nada]
+    B -->|Sí| D[setIsAILoading true]
+    D --> E[api.generateTaskWithAI]
+    E --> F{Respuesta exitosa?}
+    F -->|Sí| G[Actualizar campos del formulario]
+    G --> H[setDescription con AI]
+    H --> I[setStartDateTime con AI]
+    I --> J[setEndDateTime con AI]
+    J --> K[setEstimatedHours con AI]
+    K --> L{AI generó subtareas?}
+    L -->|Sí| M[Convertir y setSubtasks]
+    L -->|No| N[Continuar]
+    M --> N
+    N --> O[setIsAILoading false]
+    F -->|No| P[console.error]
+    P --> Q[alert con error]
+    Q --> O
+    
+    style A fill:#3b82f6,color:#fff
+    style G fill:#10b981,color:#fff
+    style P fill:#ef4444,color:#fff
+    style C fill:#6b7280,color:#fff
+```
 
 > [!WARNING]
-> El formulario valida que la fecha de fin sea posterior a la fecha de inicio. Si no se cumple, no se permite guardar.
+> El formulario valida que la fecha de fin sea posterior a la fecha de inicio. Si no se cumple, no se permite guardar. Las fechas se convierten automáticamente de `datetime-local` a ISO 8601 antes de enviarlas al backend.
 
 > [!NOTE]
-> El botón de IA solo está habilitado cuando hay un título ingresado. Muestra un tooltip "IA" al hacer hover.
+> El botón de IA solo está habilitado cuando hay un título ingresado. Muestra un tooltip "IA" al hacer hover. El formulario convierte automáticamente las fechas entre formato `datetime-local` (para inputs HTML) e ISO 8601 (para el backend).
 
 ---
 
@@ -727,6 +1012,70 @@ const task: Task = {
   subtasks: [subtask]
 };
 ```
+
+---
+
+## Integración con Backend
+
+### Flujo Completo de Comunicación
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant HP as HomePage
+    participant API as api.ts Service
+    participant BE as Backend FastAPI
+    participant DB as MongoDB
+
+    U->>HP: Cargar página
+    HP->>API: getTasks(params)
+    API->>BE: GET /tasks/?sortBy=...&filterBy=...
+    BE->>DB: Query con filtros
+    DB-->>BE: Documentos
+    BE-->>API: JSON Response
+    API-->>HP: Task[]
+    HP-->>U: Mostrar tareas
+
+    U->>HP: Crear tarea
+    HP->>API: createTask(data)
+    API->>BE: POST /tasks/
+    BE->>DB: insert_one
+    DB-->>BE: Documento creado
+    BE-->>API: TaskResponse
+    API-->>HP: Task
+    HP-->>U: Actualizar UI
+
+    U->>HP: Actualizar tarea
+    HP->>API: updateTask(id, data)
+    API->>BE: PUT /tasks/{id}
+    BE->>DB: update_one
+    DB-->>BE: Documento actualizado
+    BE-->>API: TaskResponse
+    API-->>HP: Task
+    HP-->>U: Actualizar UI
+
+    U->>HP: Eliminar tarea
+    HP->>API: deleteTask(id)
+    API->>BE: DELETE /tasks/{id}
+    BE->>DB: delete_one
+    DB-->>BE: 204 No Content
+    BE-->>API: void
+    API-->>HP: void
+    HP-->>U: Actualizar UI
+```
+
+### Configuración de la URL del Backend
+
+La URL del backend se configura mediante variables de entorno. Crea un archivo `.env` en la raíz del proyecto `FrontEnd/`:
+
+```env
+VITE_API_URL=http://localhost:8000
+```
+
+Si no se proporciona `VITE_API_URL`, el servicio usará `http://localhost:8000` por defecto.
+
+> [!IMPORTANT]
+> Las variables de entorno en Vite deben comenzar con `VITE_` para ser accesibles en el código del frontend.
 
 ---
 
@@ -1052,11 +1401,11 @@ Agregar estilos en `src/index.css`:
 
 ## Notas Importantes
 
-> [!WARNING]
-> **Persistencia**: Actualmente las tareas se almacenan solo en memoria. Se perderán al recargar la página. Implementa la integración con Supabase para persistencia permanente.
+> [!IMPORTANT]
+> **Persistencia**: Las tareas se almacenan en MongoDB a través del backend de FastAPI. Todas las operaciones CRUD se realizan mediante el servicio de API (`src/services/api.ts`).
 
 > [!NOTE]
-> **IDs de Tareas**: Se generan usando `Date.now().toString()`. Para producción, considerar usar UUIDs para evitar colisiones en sistemas distribuidos.
+> **IDs de Tareas**: Los IDs se generan automáticamente por MongoDB (ObjectId) y se convierten a strings en las respuestas del backend. No es necesario generar IDs en el frontend.
 
 > [!IMPORTANT]
 > **Fechas**: Se usan strings ISO 8601. Asegurarse de que los inputs `datetime-local` proporcionen este formato correctamente.

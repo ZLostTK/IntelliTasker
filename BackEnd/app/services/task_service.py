@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from bson import ObjectId
 
-from app.db.database import db
+from app.db import database
 from app.models.task import TaskCreate, TaskUpdate, TaskResponse, SubtaskResponse
 from app.utils.ids import validate_object_id, object_id_to_str
 
@@ -18,9 +18,13 @@ async def init_indexes():
     Inicializa los índices de la colección de tareas.
     """
     try:
-        await db.tasks.create_index("created_at")
-        await db.tasks.create_index("completed")
-        await db.tasks.create_index("startDateTime")
+        if database.db is None:
+            logger.error("Error al crear índices: db no está inicializado")
+            return
+        
+        await database.db.tasks.create_index("created_at")
+        await database.db.tasks.create_index("completed")
+        await database.db.tasks.create_index("startDateTime")
         logger.info("Índices de tareas inicializados")
     except Exception as e:
         logger.error(f"Error al crear índices: {e}")
@@ -131,11 +135,11 @@ async def create_task_service(task_data: TaskCreate) -> Optional[TaskResponse]:
         task_dict = task_data.model_dump()
         document = _prepare_task_document(task_dict)
         
-        result = await db.tasks.insert_one(document)
+        result = await database.db.tasks.insert_one(document)
         logger.info(f"Tarea creada: {result.inserted_id}, colección: tasks")
         
         # Recuperar el documento creado
-        created_doc = await db.tasks.find_one({"_id": result.inserted_id})
+        created_doc = await database.db.tasks.find_one({"_id": result.inserted_id})
         if not created_doc:
             return None
         
@@ -157,7 +161,7 @@ async def get_task_by_id_service(task_id: str) -> Optional[TaskResponse]:
     """
     try:
         oid = validate_object_id(task_id)
-        doc = await db.tasks.find_one({"_id": oid})
+        doc = await database.db.tasks.find_one({"_id": oid})
         
         if not doc:
             logger.info(f"Tarea no encontrada: {task_id}, colección: tasks")
@@ -175,14 +179,20 @@ async def get_task_by_id_service(task_id: str) -> Optional[TaskResponse]:
 
 async def get_all_tasks_service(
     completed: Optional[bool] = None,
+    sort_by: Optional[str] = None,
+    filter_by: Optional[str] = None,
+    search: Optional[str] = None,
     skip: int = 0,
     limit: int = 100
 ) -> List[TaskResponse]:
     """
-    Obtiene todas las tareas con filtros opcionales.
+    Obtiene todas las tareas con filtros opcionales y ordenamiento.
     
     Parámetros:
     - `completed`: Filtrar por estado de completado (opcional).
+    - `sort_by`: Opción de ordenamiento ('recent', 'oldest', 'dueDate', 'title', 'progress', 'duration').
+    - `filter_by`: Opción de filtrado ('all', 'completed', 'inProgress', 'overdue', 'today').
+    - `search`: Texto para buscar en título y descripción (opcional).
     - `skip`: Número de documentos a saltar.
     - `limit`: Número máximo de documentos a retornar.
     
@@ -190,19 +200,101 @@ async def get_all_tasks_service(
     - Lista de TaskResponse.
     """
     try:
+        from datetime import datetime, timezone
+        
         filter_query = {}
+        
+        # Filtro por completado (compatibilidad con API anterior)
         if completed is not None:
             filter_query["completed"] = completed
         
-        cursor = db.tasks.find(filter_query).sort("created_at", -1).skip(skip).limit(limit)
+        # Filtros avanzados
+        if filter_by:
+            now = datetime.now(timezone.utc)
+            today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+            today_end = datetime(now.year, now.month, now.day, 23, 59, 59, tzinfo=timezone.utc)
+            
+            if filter_by == 'completed':
+                filter_query["completed"] = True
+            elif filter_by == 'inProgress':
+                filter_query["completed"] = False
+            elif filter_by == 'overdue':
+                filter_query["endDateTime"] = {"$lt": now}
+            elif filter_by == 'today':
+                filter_query["$or"] = [
+                    {"startDateTime": {"$gte": today_start, "$lte": today_end}},
+                    {"endDateTime": {"$gte": today_start, "$lte": today_end}},
+                    {"$and": [
+                        {"startDateTime": {"$lt": today_start}},
+                        {"endDateTime": {"$gt": today_end}}
+                    ]}
+                ]
+        
+        # Búsqueda de texto en título y descripción
+        if search and search.strip():
+            search_regex = {"$regex": search.strip(), "$options": "i"}
+            if "$or" in filter_query:
+                # Si ya hay $or, añadir búsqueda
+                filter_query["$and"] = [
+                    {"$or": filter_query.pop("$or")},
+                    {"$or": [
+                        {"title": search_regex},
+                        {"description": search_regex}
+                    ]}
+                ]
+            else:
+                filter_query["$or"] = [
+                    {"title": search_regex},
+                    {"description": search_regex}
+                ]
+        
+        # Construir cursor base
+        cursor = database.db.tasks.find(filter_query)
+        
+        # Aplicar ordenamiento
+        sort_key = "created_at"
+        sort_direction = -1  # Por defecto: más recientes primero
+        
+        if sort_by:
+            if sort_by == 'recent':
+                sort_key = "created_at"
+                sort_direction = -1
+            elif sort_by == 'oldest':
+                sort_key = "created_at"
+                sort_direction = 1
+            elif sort_by == 'dueDate':
+                sort_key = "endDateTime"
+                sort_direction = 1
+            elif sort_by == 'title':
+                sort_key = "title"
+                sort_direction = 1
+            elif sort_by == 'duration':
+                sort_key = "estimatedHours"
+                sort_direction = -1
+            # 'progress' se maneja después de obtener los documentos
+        
+        cursor = cursor.sort(sort_key, sort_direction).skip(skip).limit(limit)
         docs = await cursor.to_list(length=limit)
         
+        # Convertir a TaskResponse
+        tasks = [_task_doc_to_response(doc) for doc in docs]
+        
+        # Ordenamiento por progreso (requiere cálculo de subtareas completadas)
+        if sort_by == 'progress':
+            def get_progress(task: TaskResponse) -> float:
+                if not task.subtasks:
+                    return 0.0
+                completed = sum(1 for st in task.subtasks if st.completed)
+                return completed / len(task.subtasks)
+            
+            tasks.sort(key=get_progress, reverse=True)
+        
         logger.info(
-            f"Tareas obtenidas: {len(docs)}, filtro: {filter_query}, "
-            f"colección: tasks"
+            f"Tareas obtenidas: {len(tasks)}, filtro: {filter_query}, "
+            f"ordenamiento: {sort_by}, colección: tasks"
         )
         
-        return [_task_doc_to_response(doc) for doc in docs]
+        return tasks
     except Exception as e:
         logger.error(f"Error al obtener tareas: {e}")
         return []
@@ -226,7 +318,7 @@ async def update_task_service(
         oid = validate_object_id(task_id)
         
         # Verificar que la tarea existe
-        existing = await db.tasks.find_one({"_id": oid})
+        existing = await database.db.tasks.find_one({"_id": oid})
         if not existing:
             logger.info(f"Tarea no encontrada para actualizar: {task_id}")
             return None
@@ -272,7 +364,7 @@ async def update_task_service(
         # Añadir timestamp de actualización
         update_data["updated_at"] = datetime.now(timezone.utc)
         
-        result = await db.tasks.update_one(
+        result = await database.db.tasks.update_one(
             {"_id": oid},
             {"$set": update_data}
         )
@@ -284,7 +376,7 @@ async def update_task_service(
         logger.info(f"Tarea actualizada: {task_id}, colección: tasks")
         
         # Recuperar el documento actualizado
-        updated_doc = await db.tasks.find_one({"_id": oid})
+        updated_doc = await database.db.tasks.find_one({"_id": oid})
         return _task_doc_to_response(updated_doc)
     except ValueError as e:
         logger.warning(f"Error de validación al actualizar tarea: {e}")
@@ -306,7 +398,7 @@ async def delete_task_service(task_id: str) -> bool:
     """
     try:
         oid = validate_object_id(task_id)
-        result = await db.tasks.delete_one({"_id": oid})
+        result = await database.db.tasks.delete_one({"_id": oid})
         
         if result.deleted_count == 0:
             logger.info(f"Tarea no encontrada para eliminar: {task_id}")
